@@ -33,6 +33,19 @@ class MeshData (object):
         if self.mesh.shape_keys:
             return self.mesh.shape_keys.key_blocks
 
+    @property
+    def vertex_groups(self):
+        self.obj.vertex_groups
+
+    def get_vertex_groups_names(self):
+        if not self.vertex_groups:
+            return
+        group_names=list()
+        for group in self.vertex_groups:
+            group_names.append(group.name)
+        return group_names
+
+
     def set_position_as_shape_key(self, shape_key_name="Data_transfer", co=None, activate=False):
         if not self.shape_keys:
             basis = self.obj.shape_key_add()

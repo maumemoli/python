@@ -28,7 +28,7 @@ class TransferShapeData(bpy.types.Operator):
         search_method = active_prop.search_method
         sample_space = active_prop.mesh_object_space
         if sample_space == 'UVS':
-            uv_space = False
+            uv_space = True
 
         if sample_space == 'LOCAL':
             world_space = False
@@ -69,7 +69,7 @@ class TransferShapeKeyData(bpy.types.Operator):
         search_method = active_prop.search_method
         sample_space = active_prop.mesh_object_space
         if sample_space == 'UVS':
-            uv_space = False
+            uv_space = True
 
         if sample_space == 'LOCAL':
             world_space = False
