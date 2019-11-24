@@ -269,13 +269,16 @@ class MeshDataTransfer (object):
         # np bool array with hit verts
         self.missed_projections = np.ones(v_count * 3, dtype=np.bool)
         self.missed_projections.shape = (v_count, 3)
+        v_normal = Vector((0.0,0.0, 1.0))
         for v in self.target.transfer_bmesh.verts:
             v_ids = self.target.vertex_map[v.index]  # gets the correspondent vert to the UV_mesh
 
             if search_method == "CLOSEST":
                 projection = self.source.bvhtree.find_nearest (v.co)
             else:
-                projection = self.source.bvhtree.ray_cast (v.co , v.normal)
+                if not self.uv_space:
+                    v_normal = v.normal
+                projection = self.source.bvhtree.ray_cast (v.co , v_normal)
             if projection[0]:
                 for v_id in v_ids:
                     self.ray_casted[v_id] = projection[0]
