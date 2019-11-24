@@ -201,7 +201,7 @@ class MeshDataTransfer (object):
                 sk_points = self.transform_vertices_array(sk_points, mat)
             transferred_sk = self.get_transferred_vert_coords(sk_points)
             if self.world_space:
-                mat = np.array (self.target.obj.matrix_world.inverted ()) @ np.array (self.source.obj.matrix_world)
+                mat = np.array(self.target.obj.matrix_world.inverted())
                 transferred_sk = self.transform_vertices_array (transferred_sk , mat)
             transferred_sk = np.where(self.missed_projections, undeformed_verts, transferred_sk)
             # extracting deltas
@@ -213,17 +213,13 @@ class MeshDataTransfer (object):
     def transfer_vertex_position(self, as_shape_key=False):
 
         transfer_coord = self.source.get_verts_position()
-        # indexes = self.related_ids.ravel()
-        # #sorting verts coordinates
-        # sorted_coords = transfer_coord[indexes]
-        # #reshaping the array
-        # sorted_coords.shape = self.hit_faces.shape
 
         #transferred_position = self.calculate_barycentric_location(sorted_coords, self.barycentric_coords)
         transferred_position = self.get_transferred_vert_coords(transfer_coord)
         if self.world_space: #inverting the matrix
             mat = np.array(self.target.obj.matrix_world.inverted()) @  np.array(self.source.obj.matrix_world)
             transferred_position = self.transform_vertices_array(transferred_position, mat)
+
 
         undeformed_verts = self.target.get_verts_position()
         transferred_position = np.where(self.missed_projections, undeformed_verts, transferred_position )
@@ -233,6 +229,7 @@ class MeshDataTransfer (object):
             self.target.set_position_as_shape_key(shape_key_name=shape_key_name,co=transferred_position, activate=True)
         else:
             self.target.set_verts_position(transferred_position)
+            self.target.mesh.update()
 
     def get_transferred_vert_coords(self , transfer_coord):
 
@@ -346,6 +343,19 @@ class MeshDataTransfer (object):
                    uv_coords[:, 1] * coords[:, 1, None] + \
                    uv_coords[:, 2] * coords[:, 2, None]
         return location
+
+    # ================================================DEBUG=============================================================
+    @staticmethod
+    def create_debug_mesh(obj, co, name):
+        print(co.shape[0])
+        copy = obj.data.copy()
+        print(len(copy.vertices))
+        new_obj = bpy.data.objects.new(name , copy)
+        bpy.context.scene.collection.objects.link (new_obj)
+        copy.vertices.foreach_set("co", co.ravel())
+        obj.data.update()
+        return  new_obj
+
 
 
 
