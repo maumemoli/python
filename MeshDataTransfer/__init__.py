@@ -15,7 +15,7 @@ bl_info = {
 import bpy
 from bpy.types import (PropertyGroup)
 from bpy.props import (PointerProperty)
-from .operators import (TransferShapeData, TransferShapeKeyData)
+from .operators import (TransferShapeData, TransferShapeKeyData, TransferVertexGroupsData)
 
 def scene_chosenobject_poll(self , object):
     if bpy.context.active_object == object:
@@ -112,10 +112,19 @@ class DATA_PT_mesh_data_transfer(bpy.types.Panel):
         #transfer shapekeys layout
         transfer_shapekeys_box_layout = main_box_layout.box()
         icon = 'TRIA_DOWN' if ob_prop.transfer_shapekeys else 'TRIA_RIGHT'
-        transfer_shapekeys_box_layout.prop(ob_prop, "transfer_shapekeys" , text="Transfer Shape_keys", icon=icon)
+        transfer_shapekeys_box_layout.prop(ob_prop, "transfer_shapekeys" , text="Transfer Shapekeys", icon=icon)
         if ob_prop.transfer_shapekeys:
             transfer_shapekeys_box_layout.operator("object.transfer_shape_key_data" , text="Transfer" ,
                                                 icon="MOD_DATA_TRANSFER")
+
+        #transfer vertex groups layout
+        transfer_shapekeys_box_layout = main_box_layout.box()
+        icon = 'TRIA_DOWN' if ob_prop.transfer_vertex_groups else 'TRIA_RIGHT'
+        transfer_shapekeys_box_layout.prop(ob_prop, "transfer_vertex_groups" , text="Transfer Vertex Groups", icon=icon)
+        if ob_prop.transfer_vertex_groups:
+            transfer_shapekeys_box_layout.operator("object.transfer_vertex_groups_data" , text="Transfer" ,
+                                                icon="MOD_DATA_TRANSFER")
+
 
         #split = box_layout.split()
         #box_layout = split.column(align=True)
@@ -151,7 +160,8 @@ class DATA_PT_mesh_data_transfer(bpy.types.Panel):
 
 #=================================================================================================================
 
-classes = (DATA_PT_mesh_data_transfer, MeshDataSettings, MeshDataGlobalSettings, TransferShapeData, TransferShapeKeyData)
+classes = (DATA_PT_mesh_data_transfer, MeshDataSettings, MeshDataGlobalSettings, TransferShapeData,
+           TransferShapeKeyData, TransferVertexGroupsData)
 
 def register():
     global classes
