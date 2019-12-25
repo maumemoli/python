@@ -37,6 +37,7 @@ class MeshData (object):
 
         self.vertex_map = {}  # the corrispondance map of the uv_vertices to the mesh vert id
 
+
         #self.get_mesh_data()
 
 
@@ -101,6 +102,21 @@ class MeshData (object):
             for v_id in v_ids:
                 value = group_weights[v_id]
                 v_group.add((int(v_id),), value, "REPLACE")
+
+    def store_shape_keys_values(self):
+        values= list()
+        for sk in self.shape_keys:
+            values.append(sk.value)
+        return values
+
+    def set_shape_keys_values(self, values):
+        for i in range(len(self.shape_keys)):
+            self.shape_keys[i].value = values[i]
+
+    def reset_shape_keys_values(self):
+        for sk in self.shape_keys:
+            if not sk.name == "Basis":
+                sk.value = 0
 
     def set_position_as_shape_key(self, shape_key_name="Data_transfer", co=None, activate=False):
         if not self.shape_keys:
@@ -210,16 +226,37 @@ class MeshData (object):
     def get_shape_keys_vert_pos(self):
         if not self.shape_keys:
             return
+        if self.deformed:
+            stored_values = self.store_shape_keys_values()
+            self.reset_shape_keys_values()
         shape_arrays = {}
         for sk in self.shape_keys:
             if sk.name == "Basis":
                 continue
             array = self.convert_shape_key_to_array(sk)
             shape_arrays[sk.name]=(array)
+        if self.deformed:
+            self.set_shape_keys_values(stored_values)
         return shape_arrays
 
-
     def convert_shape_key_to_array(self, shape_key):
+        if self.deformed:
+            # create a snapshot of the shape key
+            shape_key.value = 1.0
+            temp_mesh = bpy.data.meshes.new ("mesh")  # add the new mesh
+            temp_bm = self.generate_bmesh(deformed=True, world_space=False)
+            temp_bm.to_mesh(temp_mesh)
+            verts = temp_mesh.vertices
+            v_count = len(verts)
+            co = np.zeros (v_count * 3, dtype=np.float32)
+            verts.foreach_get("co", co)
+            co.shape = (v_count , 3)
+            temp_bm.free()
+            bpy.data.meshes.remove (temp_mesh)
+            shape_key.value = 0.0
+            return co
+
+
         v_count = len (self.mesh.vertices)
         co = np.zeros (v_count * 3, dtype=np.float32)
         shape_key.data.foreach_get("co", co)
@@ -231,6 +268,20 @@ class MeshData (object):
         Get the mesh vertex coordinated
         :return: np.array
         """
+        if self.deformed:
+            # print("Getting deformed vertices position for {}".format(self.obj.name))
+            temp_bm = self.generate_bmesh(deformed=self.deformed, world_space=False)
+            temp_mesh = bpy.data.meshes.new ("mesh")  # add the new mesh
+            temp_bm.to_mesh(temp_mesh)
+            verts = temp_mesh.vertices
+            v_count = len (verts)
+            co = np.zeros (v_count * 3 , dtype=np.float32)
+            verts.foreach_get("co", co)
+            co.shape = (v_count , 3)
+            bpy.data.meshes.remove (temp_mesh)
+            temp_bm.free()
+            return co
+        # print ("Getting non deformed vertices position for {}".format (self.obj.name))
         v_count = len (self.mesh.vertices)
         co = np.zeros (v_count * 3, dtype=np.float32)
         self.mesh.vertices.foreach_get("co", co)
@@ -383,7 +434,7 @@ class MeshDataTransfer (object):
             bpy.context.view_layer.objects.active = self.target.obj
 
 
-
+        transfer_source = self.source.obj
         loop_mapping =  'POLYINTERP_NEAREST'
         poly_mapping = 'POLYINTERP_PNORPROJ'
         if self.topology:
@@ -391,7 +442,7 @@ class MeshDataTransfer (object):
             poly_mapping = "TOPOLOGY"
         data_transfer = self.target.obj.modifiers.new (name="Data Transfer" , type="DATA_TRANSFER")
         data_transfer.use_object_transform = self.world_space
-        data_transfer.object = self.source.obj
+        data_transfer.object = transfer_source.obj
         data_transfer.use_loop_data = True
         # options: 'TOPOLOGY', 'NEAREST_NORMAL', 'NEAREST_POLYNOR',
         # 'NEAREST_POLY', 'POLYINTERP_NEAREST', 'POLYINTERP_LNORPROJ'
@@ -401,7 +452,7 @@ class MeshDataTransfer (object):
         data_transfer.data_types_loops = {"UV" , }
         data_transfer.use_poly_data = True
 
-        active_uv = self.source.mesh.uv_layers.active
+        active_uv = transfer_source.mesh.uv_layers.active
         data_transfer.layers_uv_select_src = active_uv.name
         # options: ('TOPOLOGY', 'NEAREST', 'NORMAL', 'POLYINTERP_PNORPROJ')
 

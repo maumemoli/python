@@ -17,7 +17,7 @@ class TransferShapeData(bpy.types.Operator):
 
         active = context.active_object
         active_prop = context.object.mesh_data_transfer_object
-
+        deformed_source = active_prop.transfer_modified_source
         sc_prop = context.scene.mesh_data_transfer_global
         as_shape_key = active_prop.transfer_shape_as_key
         source = active.mesh_data_transfer_object.mesh_source
@@ -37,6 +37,7 @@ class TransferShapeData(bpy.types.Operator):
         if sample_space == 'WORLD':
             world_space = True
         transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space,
+                                         deformed_source=deformed_source,
                                          uv_space=uv_space, search_method=search_method)
         transferred = transfer_data.transfer_vertex_position(as_shape_key=as_shape_key)
         transfer_data.free()
@@ -64,6 +65,7 @@ class TransferShapeKeyData(bpy.types.Operator):
         active = context.active_object
         active_prop = context.object.mesh_data_transfer_object
 
+        deformed_source = active_prop.transfer_modified_source
         sc_prop = context.scene.mesh_data_transfer_global
         as_shape_key = active_prop.transfer_shape_as_key
         source = active.mesh_data_transfer_object.mesh_source
@@ -83,7 +85,7 @@ class TransferShapeKeyData(bpy.types.Operator):
         if sample_space == 'WORLD':
             world_space = True
         transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space,
-                                         uv_space=uv_space, search_method=search_method)
+                                         uv_space=uv_space,deformed_source= deformed_source ,search_method=search_method)
         transferred = transfer_data.transfer_shape_keys()
         transfer_data.free()
         if not transferred:

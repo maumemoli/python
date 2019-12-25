@@ -44,6 +44,9 @@ class MeshDataSettings(PropertyGroup):
 
     transfer_shape_as_key : bpy.props.BoolProperty ()
 
+    transfer_modified_target : bpy.props.BoolProperty ()
+    transfer_modified_source : bpy.props.BoolProperty ()
+
 class MeshDataGlobalSettings(PropertyGroup):
 
     transfer_modified_target : bpy.props.BoolProperty ()
@@ -91,13 +94,13 @@ class DATA_PT_mesh_data_transfer(bpy.types.Panel):
 
         #option_row.use_property_split = True
         # sample_target_mod = main_box_layout.row ()
-        # sample_target_mod.prop(sc_prop, 'transfer_modified_target', text="Sample Modified Target", icon='MESH_DATA')
-        # sample_source_mod = sample_target_mod.split()
-        # sample_source_mod.prop(sc_prop, 'transfer_modified_source', text="Sample Modified Source", icon='MESH_DATA')
+        # sample_target_mod.prop(ob_prop, 'transfer_modified_target', text="Sample Modified Target", icon='MESH_DATA')
+        sample_source_mod =  main_box_layout.row ()
+        sample_source_mod.prop(ob_prop, 'transfer_modified_source', text="Sample Modified Source", icon='MESH_DATA')
 
-        # if ob_prop.mesh_object_space not in {'WORLD', 'LOCAL'}:
-        #     sample_target_mod.enabled = False
-        #     sample_source_mod.enabled = False
+        if ob_prop.mesh_object_space not in {'WORLD', 'LOCAL', 'UVS'}:
+            # sample_target_mod.enabled = False
+            sample_source_mod.enabled = False
 
         #mesh picker layout
         mesh_picker_box_layout = main_box_layout.box()
