@@ -2,10 +2,10 @@ bl_info = {
     "name" : "MeshDataTransfer",
     "author" : "Maurizio Memoli",
     "description" : "This add on will transfer geometry data from one mesh to another based on 3 different spaces:"
-                    " 'world, object, uv' ",
+                    " 'world, object, uv' also will tranfer UVs based on topology",
     "blender" : (2, 80, 0),
-    "version" : (0, 0, 0,),
-    "location" : "",
+    "version" : (1, 0, 0,),
+    "location" : "(Object Mode) Mesh > ObjectData > Mesh Data Transfer ",
     "warning" : "",
     "wiki_url": "",
     "category" : "Mesh"
@@ -25,20 +25,20 @@ def scene_chosenobject_poll(self , object):
 
 class MeshDataSettings(PropertyGroup):
     mesh_object_space: bpy.props.EnumProperty(
-        items=[('WORLD', 'World', '', 1),('LOCAL', 'Local', '', 2), ('UVS', 'Active UV', '', 3)],
+        items=[('WORLD', 'World', '', 1),('LOCAL', 'Local', '', 2), ('UVS', 'Active UV', '', 3), ('TOPOLOGY', 'Topology', '', 4)],
         name="Object Space", default = 'LOCAL')
 
     search_method: bpy.props.EnumProperty(
         items=[('CLOSEST', 'Closest', '', 1),('RAYCAST', 'Raycast', '', 2)],
         name="Search method")
 
-    transfer_shape: bpy.props.BoolProperty()
-
-    transfer_shapekeys: bpy.props.BoolProperty()
-
-    transfer_vertex_groups : bpy.props.BoolProperty()
-
-    transfer_uv_data: bpy.props.BoolProperty ()
+    # transfer_shape: bpy.props.BoolProperty()
+    #
+    # transfer_shapekeys: bpy.props.BoolProperty()
+    #
+    # transfer_vertex_groups : bpy.props.BoolProperty()
+    #
+    # transfer_uv_data: bpy.props.BoolProperty ()
 
     mesh_source: bpy.props.PointerProperty(type=bpy.types.Object, poll=scene_chosenobject_poll)
 
@@ -84,9 +84,9 @@ class DATA_PT_mesh_data_transfer(bpy.types.Panel):
         option_label = sample_main_box.row()
         option_label.alignment = 'CENTER'
         option_label.label(text="Sample Space")
-        option_row = main_box_layout.row()
+        option_row = sample_main_box.row()
         option_row.prop(ob_prop, "mesh_object_space", expand=True, text="Sample space")
-        option_row2 = main_box_layout.row()
+        option_row2 = sample_main_box.row()
         option_row2.prop(ob_prop, 'search_method', expand=True, text="Search method")
 
         #option_row.use_property_split = True

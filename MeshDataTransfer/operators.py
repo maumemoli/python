@@ -1,5 +1,5 @@
 import bpy
-from .mesh_data_transfer import MeshDataTransfer,transfer_uvs, MeshData, UVMeshData, UVMeshDataTransfer
+from .mesh_data_transfer import MeshDataTransfer
 
 class TransferShapeData(bpy.types.Operator):
     """Tooltip"""
@@ -9,8 +9,9 @@ class TransferShapeData(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
+        sample_space = context.object.mesh_data_transfer_object.mesh_object_space
         return context.active_object is not None \
-               and context.active_object.mesh_data_transfer_object.mesh_source is not None
+               and context.active_object.mesh_data_transfer_object.mesh_source is not None and sample_space != "TOPOLOGY"
 
     def execute(self, context):
 
@@ -37,7 +38,11 @@ class TransferShapeData(bpy.types.Operator):
             world_space = True
         transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space,
                                          uv_space=uv_space, search_method=search_method)
-        transfer_data.transfer_vertex_position(as_shape_key=as_shape_key)
+        transferred = transfer_data.transfer_vertex_position(as_shape_key=as_shape_key)
+        transfer_data.free()
+        if not transferred:
+            self.report({'INFO'}, 'Unable to perform the operation.')
+            return{'CANCELLED'}
 
         return {'FINISHED'}
 
@@ -50,8 +55,9 @@ class TransferShapeKeyData(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
+        sample_space = context.object.mesh_data_transfer_object.mesh_object_space
         return context.active_object is not None \
-               and context.active_object.mesh_data_transfer_object.mesh_source is not None
+               and context.active_object.mesh_data_transfer_object.mesh_source is not None and sample_space != "TOPOLOGY"
 
     def execute(self, context):
 
@@ -78,7 +84,11 @@ class TransferShapeKeyData(bpy.types.Operator):
             world_space = True
         transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space,
                                          uv_space=uv_space, search_method=search_method)
-        transfer_data.transfer_shape_keys()
+        transferred = transfer_data.transfer_shape_keys()
+        transfer_data.free()
+        if not transferred:
+            self.report({'INFO'}, 'Unable to perform the operation.')
+            return{'CANCELLED'}
 
         return {'FINISHED'}
 
@@ -91,8 +101,10 @@ class TransferVertexGroupsData(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
+        sample_space = context.object.mesh_data_transfer_object.mesh_object_space
         return context.active_object is not None \
-               and context.active_object.mesh_data_transfer_object.mesh_source is not None
+               and context.active_object.mesh_data_transfer_object.mesh_source is not None and sample_space != "TOPOLOGY"
+
 
     def execute(self, context):
 
@@ -119,7 +131,11 @@ class TransferVertexGroupsData(bpy.types.Operator):
             world_space = True
         transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space,
                                          uv_space=uv_space, search_method=search_method)
-        transfer_data.transfer_vertex_groups()
+        transferred = transfer_data.transfer_vertex_groups()
+        transfer_data.free()
+        if not transferred:
+            self.report({'INFO'}, 'Unable to perform the operation.')
+            return{'CANCELLED'}
 
         return {'FINISHED'}
 
@@ -145,7 +161,7 @@ class TransferUVData(bpy.types.Operator):
         # target_prop = target.mesh_data_transfer_global
 
         world_space = False
-        uv_space = False
+        topology = False
 
         search_method = active_prop.search_method
         sample_space = active_prop.mesh_object_space
@@ -158,9 +174,14 @@ class TransferUVData(bpy.types.Operator):
         if sample_space == 'WORLD':
             world_space = True
 
+        if sample_space == 'TOPOLOGY':
+            topology = True
+
         #transfer_uvs(active, target, world_space)
-        transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space, search_method=search_method)
+        transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space,
+                                         search_method=search_method, topology=topology)
         transfer_data.transfer_uvs()
+        transfer_data.free()
 
 
         return {'FINISHED'}
