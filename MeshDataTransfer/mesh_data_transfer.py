@@ -442,7 +442,7 @@ class MeshDataTransfer (object):
             poly_mapping = "TOPOLOGY"
         data_transfer = self.target.obj.modifiers.new (name="Data Transfer" , type="DATA_TRANSFER")
         data_transfer.use_object_transform = self.world_space
-        data_transfer.object = transfer_source.obj
+        data_transfer.object = transfer_source
         data_transfer.use_loop_data = True
         # options: 'TOPOLOGY', 'NEAREST_NORMAL', 'NEAREST_POLYNOR',
         # 'NEAREST_POLY', 'POLYINTERP_NEAREST', 'POLYINTERP_LNORPROJ'
@@ -452,7 +452,7 @@ class MeshDataTransfer (object):
         data_transfer.data_types_loops = {"UV" , }
         data_transfer.use_poly_data = True
 
-        active_uv = transfer_source.mesh.uv_layers.active
+        active_uv = transfer_source.data.uv_layers.active
         data_transfer.layers_uv_select_src = active_uv.name
         # options: ('TOPOLOGY', 'NEAREST', 'NORMAL', 'POLYINTERP_PNORPROJ')
 

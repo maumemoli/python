@@ -11,7 +11,8 @@ class TransferShapeData(bpy.types.Operator):
     def poll(cls, context):
         sample_space = context.object.mesh_data_transfer_object.mesh_object_space
         return context.active_object is not None \
-               and context.active_object.mesh_data_transfer_object.mesh_source is not None and sample_space != "TOPOLOGY"
+               and context.active_object.mesh_data_transfer_object.mesh_source is not None\
+               and sample_space != "TOPOLOGY" and bpy.context.object.mode == "OBJECT"
 
     def execute(self, context):
 
@@ -58,7 +59,8 @@ class TransferShapeKeyData(bpy.types.Operator):
     def poll(cls, context):
         sample_space = context.object.mesh_data_transfer_object.mesh_object_space
         return context.active_object is not None \
-               and context.active_object.mesh_data_transfer_object.mesh_source is not None and sample_space != "TOPOLOGY"
+               and context.active_object.mesh_data_transfer_object.mesh_source is not None\
+               and sample_space != "TOPOLOGY" and bpy.context.object.mode == "OBJECT"
 
     def execute(self, context):
 
@@ -104,8 +106,10 @@ class TransferVertexGroupsData(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         sample_space = context.object.mesh_data_transfer_object.mesh_object_space
+
         return context.active_object is not None \
-               and context.active_object.mesh_data_transfer_object.mesh_source is not None and sample_space != "TOPOLOGY"
+               and context.active_object.mesh_data_transfer_object.mesh_source is not None \
+               and sample_space != "TOPOLOGY" and bpy.context.object.mode == "OBJECT"
 
 
     def execute(self, context):
@@ -150,7 +154,8 @@ class TransferUVData(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return context.active_object is not None \
-               and context.active_object.mesh_data_transfer_object.mesh_source is not None
+               and context.active_object.mesh_data_transfer_object.mesh_source is not None \
+               and bpy.context.object.mode == "OBJECT"
 
     def execute(self, context):
 
