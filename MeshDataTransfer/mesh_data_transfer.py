@@ -79,8 +79,18 @@ class MeshData (object):
                 print("{} id is {}".format(group.name, group.index))
         if v_group is None:
             return
-        weights = self.get_vertex_groups_weights()
-        return weights[v_group:]
+        v_count = len(self.mesh.vertices)
+        weights = np.zeros (v_count , dtype=np.float32)
+        for v in self.mesh.vertices:
+            groups = v.groups
+            for group in groups:
+                i = group.group
+                if i == v_group:
+                    v_index = v.index
+                    weight = group.weight
+                    weights[v_index] = weight
+        weights.shape = (v_count , 1)
+        return weights
 
 
     def get_vertex_groups_weights(self):
