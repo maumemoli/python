@@ -122,7 +122,7 @@ class MeshData (object):
                 self.vertex_groups.remove(v_group)
             group_weights = weights[:, i]
             v_ids = np.nonzero(group_weights)[0]
-            v_group = self.obj.vertex_groups.new()
+            v_group = self.obj.vertex_groups.new(name=group_name)
             for v_id in v_ids:
                 value = group_weights[v_id]
                 v_group.add((int(v_id),), value, "REPLACE")
