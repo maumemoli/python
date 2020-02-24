@@ -76,7 +76,7 @@ class TransferShapeKeyData(bpy.types.Operator):
         mask_vertex_group = active_prop.vertex_group_filter
         invert_mask = active_prop.invert_vertex_group_filter
         # target_prop = target.mesh_data_transfer_global
-
+        exclude_muted_shapekeys = active_prop.exclude_muted_shapekeys
         world_space = False
         uv_space = False
 
@@ -92,7 +92,7 @@ class TransferShapeKeyData(bpy.types.Operator):
             world_space = True
         transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space,
                                          uv_space=uv_space,deformed_source= deformed_source , invert_vertex_group= invert_mask,
-                                         search_method=search_method, vertex_group=mask_vertex_group)
+                                         search_method=search_method, vertex_group=mask_vertex_group, exclude_muted_shapekeys = exclude_muted_shapekeys)
         transferred = transfer_data.transfer_shape_keys()
         transfer_data.free()
         if not transferred:
@@ -127,6 +127,7 @@ class TransferVertexGroupsData(bpy.types.Operator):
         source = active.mesh_data_transfer_object.mesh_source
         mask_vertex_group = active_prop.vertex_group_filter
         invert_mask = active_prop.invert_vertex_group_filter
+        exclude_locked_groups = active_prop.exclude_locked_groups
         # target_prop = target.mesh_data_transfer_global
 
         world_space = False
@@ -144,7 +145,7 @@ class TransferVertexGroupsData(bpy.types.Operator):
             world_space = True
         transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space,
                                          invert_vertex_group = invert_mask, uv_space=uv_space, search_method=search_method,
-                                         vertex_group=mask_vertex_group)
+                                         vertex_group=mask_vertex_group, exclude_locked_groups= exclude_locked_groups)
         transferred = transfer_data.transfer_vertex_groups()
         transfer_data.free()
         if not transferred:
