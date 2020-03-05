@@ -3,7 +3,7 @@ import bpy
 from mathutils import Vector
 import numpy as np
 from mathutils.bvhtree import BVHTree
-from mathutils import(Vector, Matrix )
+from mathutils import(Vector, Matrix, kdtree )
 from mathutils.geometry import (intersect_line_line, intersect_line_line_2d, intersect_point_line,
                                 intersect_line_plane, intersect_ray_tri, distance_point_to_plane, barycentric_transform )
 import sys
@@ -340,7 +340,8 @@ class MeshData (object):
 class MeshDataTransfer (object):
     def __init__(self, source, target, uv_space=False, deformed_source=False,
                  deformed_target=False, world_space=False, search_method="RAYCAST",
-                 topology=False, vertex_group = None, invert_vertex_group = False, exclude_locked_groups = False, exclude_muted_shapekeys=False):
+                 topology=False, vertex_group = None, invert_vertex_group = False, exclude_locked_groups = False,
+                 exclude_muted_shapekeys=False, snap_to_closest = False):
         self.vertex_group = vertex_group
         self.uv_space = uv_space
         self.topology = topology
@@ -355,6 +356,7 @@ class MeshDataTransfer (object):
         self.invert_vertex_group = invert_vertex_group
         self.exclude_muted_shapekeys = exclude_muted_shapekeys
         self.exclude_locked_groups = exclude_locked_groups
+        self.snap_to_closest = snap_to_closest
 
         self.missed_projections = None
         self.ray_casted = None
@@ -385,6 +387,27 @@ class MeshDataTransfer (object):
             self.target.free()
         if self.source:
             self.source.free()
+    def snap_coords_to_source_verts(self, coords, source_coords):
+        """
+        Find the closest vertex on source coordinates to the target coordinates
+        :param coords: target transformed coordinates
+        :param source_coords: source coordinates
+        :return: snapped coordinates
+        """
+        source_size = len(self.source.mesh.vertices)
+        kd = kdtree.KDTree(source_size)
+        snapped_coords = coords
+        for i, co in enumerate(source_coords):
+            kd.insert(co, i)
+        kd.balance()
+        for i in range(len(coords)):
+            co = coords[i]
+            snapped = kd.find(co)
+
+            snapped_coords[i] = snapped[0]
+        return snapped_coords
+
+
 
     def transfer_shape_keys(self):
         shape_keys = self.source.get_shape_keys_vert_pos(exclude_muted=self.exclude_muted_shapekeys)
@@ -404,12 +427,18 @@ class MeshDataTransfer (object):
                 mat =np.array(self.source.obj.matrix_world)
                 sk_points = self.transform_vertices_array(sk_points, mat)
             transferred_sk = self.get_transferred_vert_coords(sk_points)
+            #snap to vertices
+            if self.snap_to_closest:
+                transferred_sk = self.snap_coords_to_source_verts(transferred_sk, sk_points)
             if self.world_space:
                 mat = np.array(self.target.obj.matrix_world.inverted())
                 transferred_sk = self.transform_vertices_array (transferred_sk , mat)
+
             transferred_sk = np.where(self.missed_projections, undeformed_verts, transferred_sk)
             # extracting deltas
             transferred_sk = transferred_sk - base_transferred_position
+
+
             # filter on vertex group
             if isinstance (masked_vertices , (np.ndarray , np.generic)):
                 delta = transferred_sk * masked_vertices
@@ -454,6 +483,9 @@ class MeshDataTransfer (object):
 
         #transferred_position = self.calculate_barycentric_location(sorted_coords, self.barycentric_coords)
         transferred_position = self.get_transferred_vert_coords(transfer_coord)
+        if self.snap_to_closest:
+            transferred_position = self.snap_coords_to_source_verts (transferred_position , transfer_coord)
+
         if self.world_space: #inverting the matrix
             mat = np.array(self.target.obj.matrix_world.inverted()) @  np.array(self.source.obj.matrix_world)
             transferred_position = self.transform_vertices_array(transferred_position, mat)
@@ -464,14 +496,12 @@ class MeshDataTransfer (object):
         transferred_position = np.where(self.missed_projections, undeformed_verts, transferred_position )
         # filtering through vertex
         masked_vertices = self.get_vertices_mask ()
+
+
         if isinstance(masked_vertices, (np.ndarray, np.generic)):
             delta =transferred_position - undeformed_verts
             delta = delta * masked_vertices
             transferred_position = undeformed_verts + delta
-
-
-
-
 
 
         return transferred_position
