@@ -67,6 +67,10 @@ class MeshDataSettings(PropertyGroup):
     snap_to_closest_shapekey: bpy.props.BoolProperty (name="Snap shape key to closest vertex",
                                                    description="Snap transferred shape keys vertices to closest vertex on source shape key")
 
+    transfer_shapekeys_drivers: bpy.props.BoolProperty (name="Transfer shape keys drivers",
+                                                   description="Transfer the drivers along with the shape keys.")
+
+
 class MeshDataGlobalSettings(PropertyGroup):
     transfer_modified_target : bpy.props.BoolProperty ()
     transfer_modified_source : bpy.props.BoolProperty ()
@@ -147,7 +151,8 @@ class DATA_PT_mesh_data_transfer(bpy.types.Panel):
                                          toggle=True, icon=snap_key_icon)
         left_bottom_row_box_layout.prop(ob_prop , "exclude_muted_shapekeys" , text="",
                                          toggle=True, icon='CHECKMARK')
-
+        left_bottom_row_box_layout.prop(ob_prop , "transfer_shapekeys_drivers" , text="",
+                                         toggle=True, icon='DRIVER')
 
 
         top_row_layout.split()
