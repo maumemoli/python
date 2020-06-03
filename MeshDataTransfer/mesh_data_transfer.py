@@ -2,6 +2,7 @@ import bmesh
 import bpy
 from mathutils import Vector
 import numpy as np
+import codecs
 from mathutils.bvhtree import BVHTree
 from mathutils import(Vector, Matrix, kdtree )
 from mathutils.geometry import (intersect_line_line, intersect_line_line_2d, intersect_point_line,
@@ -474,10 +475,13 @@ class MeshDataTransfer (object):
         for source_f_curve in source_f_curves:
             source_driver = source_f_curve.driver
             # finding the input
-            source_shape_key = source_f_curve.data_path.split('"')[1]
+
+            source_shape_key = '['.join(source_f_curve.data_path.split('[')[1:])
+            source_shape_key = "]".join(source_shape_key.split("]")[:-1])[1:-1]
+            source_shape_key = codecs.decode(source_shape_key, 'unicode_escape')
             if source_shape_key not in target_shape_keys_names:
                 continue
-            source_channel = source_f_curve.data_path.split(".")[1]
+            source_channel = source_f_curve.data_path.split(".")[-1]
             # create the target driver
 
             target_driver = self.target.shape_keys[source_shape_key].driver_add(source_channel).driver
