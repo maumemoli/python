@@ -638,11 +638,7 @@ class MeshDataTransfer (object):
             data_transfer.invert_vertex_group = self.invert_vertex_group
         data_transfer.poly_mapping = poly_mapping
         bpy.ops.object.datalayout_transfer (modifier=data_transfer.name)
-        bpy.ops.object.modifier_apply(apply_as="DATA", modifier=data_transfer.name)
-
-
-        # bpy.context.view_layer.objects.active = current_object
-        # bpy.ops.object.mode_set (mode=current_mode)
+        bpy.ops.object.modifier_apply( modifier=data_transfer.name)
 
     @staticmethod
     def transform_vertices_array(array, mat):
