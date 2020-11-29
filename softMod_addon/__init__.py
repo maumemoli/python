@@ -3,7 +3,7 @@ bl_info = {
     "author" : "Maurizio Memoli",
     "description" : "",
     "blender" : (2, 80, 0),
-    "version" : (2, 0, 0,),
+    "version" : (2, 1, 0,),
     "location" : "",
     "warning" : "",
     "wiki_url": "",
@@ -35,21 +35,21 @@ class SoftModSettings(PropertyGroup):
         description ="Enable surface falloff",
         default=False)
 
-    show_widget_properties = bpy.props.BoolProperty (default=True)
+    show_widget_properties: bpy.props.BoolProperty (default=True)
 
-    show_mesh_properties = bpy.props.BoolProperty (default=True)
+    show_mesh_properties: bpy.props.BoolProperty (default=True)
 
-    show_global_properties = bpy.props.BoolProperty (default=True)
+    show_global_properties: bpy.props.BoolProperty (default=True)
 
-    widget_name = bpy.props.StringProperty (default="")
+    widget_name: bpy.props.StringProperty (default="")
 
-    widget_global_size = bpy.props.FloatProperty (default=0.0)
+    widget_global_size: bpy.props.FloatProperty (default=0.0)
 
-    smooth_iterations = bpy.props.IntProperty (default=2, min=0)
+    smooth_iterations: bpy.props.IntProperty (default=2, min=0)
 
-    smooth_factor = bpy.props.FloatProperty (default=1.0, min=0.0, max=1.0)
+    smooth_factor: bpy.props.FloatProperty (default=1.0, min=0.0, max=1.0)
 
-    smooth_expand = bpy.props.FloatProperty (default=0.0, min = 0.0, max= 1.0)
+    smooth_expand: bpy.props.FloatProperty (default=0.0, min = 0.0, max= 1.0)
 
 
 
