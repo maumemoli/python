@@ -109,6 +109,65 @@ class TransferShapeKeyData(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class TransferShapeKeyDrivers(bpy.types.Operator):
+    """Tooltip"""
+    bl_idname = "object.transfer_shape_key_drivers"
+    bl_label = "Simple Object Operator"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        sample_space = context.object.mesh_data_transfer_object.mesh_object_space
+        return context.active_object is not None \
+               and context.active_object.mesh_data_transfer_object.mesh_source is not None\
+               and sample_space != "TOPOLOGY" and bpy.context.object.mode == "OBJECT"
+
+    def execute(self, context):
+
+        active = context.active_object
+        active_prop = context.object.mesh_data_transfer_object
+
+        deformed_source = active_prop.transfer_modified_source
+        # sc_prop = context.scene.mesh_data_transfer_global
+        as_shape_key = active_prop.transfer_shape_as_key
+        source = active.mesh_data_transfer_object.mesh_source
+        source_arm = active.mesh_data_transfer_object.arm_source
+        target_arm = active.mesh_data_transfer_object.arm_target
+        mask_vertex_group = active_prop.vertex_group_filter
+        invert_mask = active_prop.invert_vertex_group_filter
+        snap_to_closest = active_prop.snap_to_closest_shapekey
+        # target_prop = target.mesh_data_transfer_global
+        exclude_muted_shapekeys = active_prop.exclude_muted_shapekeys
+        transfer_drivers = active_prop.transfer_shapekeys_drivers
+        world_space = False
+        uv_space = False
+
+        search_method = active_prop.search_method
+        sample_space = active_prop.mesh_object_space
+        if sample_space == 'UVS':
+            uv_space = True
+
+        if sample_space == 'LOCAL':
+            world_space = False
+
+        if sample_space == 'WORLD':
+            world_space = True
+        transfer_data = MeshDataTransfer(target=active, source =source, world_space=world_space,
+                                         uv_space=uv_space,deformed_source= deformed_source ,
+                                         invert_vertex_group= invert_mask,
+                                         search_method=search_method, vertex_group=mask_vertex_group,
+                                         exclude_muted_shapekeys = exclude_muted_shapekeys,
+                                         snap_to_closest=snap_to_closest, transfer_drivers= transfer_drivers,
+                                         source_arm= source_arm, target_arm= target_arm)
+        transferred = transfer_data.transfer_shape_keys_drivers()
+        transfer_data.free()
+        if not transferred:
+            self.report({'INFO'}, 'Unable to perform the operation.')
+            return{'CANCELLED'}
+
+        return {'FINISHED'}
+
+
 class TransferVertexGroupsData(bpy.types.Operator):
     """Tooltip"""
     bl_idname = "object.transfer_vertex_groups_data"

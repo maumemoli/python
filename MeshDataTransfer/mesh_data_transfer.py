@@ -23,6 +23,102 @@ MeshData:
 
 '''
 
+class GreasePencilData(object):
+    def __init__(self, obj, deformed=False, world_space=False, uv_space=False, triangulate = True):
+        self.obj = obj
+        self.grease_pencil = obj.data
+        self.deformed = deformed
+        self.world_space = world_space
+        self.uv_space = uv_space
+
+        self.triangulate = triangulate
+        self.bvhtree = None  # bvhtree for point casting
+        self.transfer_bmesh = None
+
+        self.vertex_map = {}  # the corrispondance map of the uv_vertices to the mesh vert id
+
+    def free(self):
+        if self.transfer_bmesh:
+            self.transfer_bmesh.free()
+        if self.bvhtree:
+            self.bvhtree = None
+
+    @property
+    def active_strokes(self):
+        strokes = list()
+        for layer in self.grease_pencil.layers:
+            active_frame = layer.active_frame
+            for stroke in active_frame.strokes:
+                strokes.append(stroke)
+        return strokes
+
+    @property
+    def active_points(self):
+        points = list()
+        for stroke in self.active_strokes:
+            for point in stroke.points:
+                points.append(point)
+        return points
+
+    @property
+    def v_count(self):
+        return len(self.active_points)
+
+    @property
+    def vertex_groups(self):
+        return self.obj.vertex_groups
+
+    def get_locked_vertex_groups_array(self):
+        v_groups =self.vertex_groups
+        if not v_groups:
+            return
+        array = []
+        for g in v_groups:
+            array.append(not g.lock_weight)
+        return array
+
+    def get_vertex_groups_names(self, ignore_locked = False):
+        if not self.vertex_groups:
+            return
+        group_names=list()
+        for group in self.vertex_groups:
+            group_names.append(group.name)
+        if ignore_locked:
+            filter_array = self.get_locked_vertex_groups_array()
+            for i in range(len(filter_array)):
+                if not filter_array[i]:
+                    group_names.pop(i)
+        return group_names
+
+
+    def generate_bmesh(self, deformed=True, world_space=True):
+        """
+        Create a bmesh from the mesh.
+        This will capture the deformers too.
+        :param deformed:
+        :param transformed:
+        :param object:
+        :return:
+        """
+        bm = bmesh.new ()
+        if deformed:
+            depsgraph = bpy.context.evaluated_depsgraph_get ()
+            ob_eval = self.obj.evaluated_get (depsgraph)
+            mesh = ob_eval.to_mesh ()
+            bm.from_mesh (mesh)
+            ob_eval.to_mesh_clear ()
+        else:
+            mesh = self.obj.to_mesh ()
+            bm.from_mesh (mesh)
+        if world_space:
+            bm.transform (self.obj.matrix_world)
+            self.evalued_in_world_coords = True
+        else:
+            self.evalued_in_world_coords = False
+        bm.verts.ensure_lookup_table ()
+
+        return bm
+
 
 class MeshData (object):
     def __init__(self, obj, deformed=False, world_space=False, uv_space=False, triangulate = True):
@@ -38,16 +134,19 @@ class MeshData (object):
 
         self.vertex_map = {}  # the corrispondance map of the uv_vertices to the mesh vert id
 
-
-        #self.get_mesh_data()
-
-
     def free(self):
         if self.transfer_bmesh:
             self.transfer_bmesh.free()
         if self.bvhtree:
             self.bvhtree = None
 
+    @property
+    def seam_edges(self):
+        return self.get_seam_edges()
+
+    @seam_edges.setter
+    def seam_edges(self, edges):
+        self.set_seam_edges(edges)
 
     @property
     def shape_keys(self):
@@ -63,7 +162,7 @@ class MeshData (object):
         return len(self.mesh.vertices)
 
     def get_locked_vertex_groups_array(self):
-        v_groups =self.vertex_groups
+        v_groups = self.vertex_groups
         if not v_groups:
             return
         array = []
@@ -94,7 +193,15 @@ class MeshData (object):
         if self.shape_keys:
             return [x.name for x in self.shape_keys]
 
+    def get_seam_edges(self):
+        edges = self.mesh.edges
+        edges_array = [True] * len (edges)
+        edges.foreach_get ("use_seam" , edges_array)
+        return edges_array
 
+    def set_seam_edges(self , edges_array):
+        edges = self.mesh.edges
+        edges.foreach_set ("use_seam" , edges_array)
 
     def get_vertex_group_weights(self, vertex_group_name):
         v_groups = self.vertex_groups
@@ -117,7 +224,6 @@ class MeshData (object):
                     weights[v_index] = weight
         weights.shape = (v_count, 1)
         return weights
-
 
     def get_vertex_groups_weights(self, ignore_locked = False):
         v_groups = self.vertex_groups
@@ -239,7 +345,7 @@ class MeshData (object):
         else:
             for v in bm.verts:
                 self.vertex_map[v.index] = [v.index]
-                self.transfer_bmesh = bm
+            self.transfer_bmesh = bm
 
         # triangulating the mesh
         if self.triangulate:
@@ -353,7 +459,8 @@ class MeshDataTransfer (object):
     def __init__(self, source, target, uv_space=False, deformed_source=False,
                  deformed_target=False, world_space=False, search_method="RAYCAST",
                  topology=False, vertex_group = None, invert_vertex_group = False, exclude_locked_groups = False,
-                 exclude_muted_shapekeys=False, snap_to_closest = False, transfer_drivers = False):
+                 exclude_muted_shapekeys=False, snap_to_closest = False, transfer_drivers = False,
+                 source_arm =None, target_arm = None):
         self.vertex_group = vertex_group
         self.uv_space = uv_space
         self.topology = topology
@@ -378,6 +485,9 @@ class MeshDataTransfer (object):
         self.transfer_drivers = transfer_drivers
         self.cast_verts()
         self.barycentric_coords = self.get_barycentric_coords(self.ray_casted, self.hit_faces)
+
+        self.source_arm = source_arm
+        self.target_arm = target_arm
 
     def get_vertices_mask(self):
         """
@@ -490,20 +600,75 @@ class MeshDataTransfer (object):
             # copying variables over
             for source_var in source_driver.variables:
                 target_var = target_driver.variables.new()
-                # coping the variable targets over
-                for i, source_var_target in source_var.targets.items():
-                    target_var.targets[i].id_type = source_var_target.id_type
-                    source_target_id = source_var_target.id
-                    # replace the shape key target id
-                    if source_target_id == self.source.mesh.shape_keys:
-                        source_target_id = self.target.mesh.shape_keys
-                    target_var.targets[i].id = source_target_id
-                    target_var.targets[i].transform_space = source_var_target.transform_space
-                    target_var.targets[i].transform_type = source_var_target.transform_type
-                    target_var.targets[i].data_path = source_var_target.data_path
-                    target_var.targets[i].bone_target = source_var_target.bone_target
+                source_var_type = source_var.type
                 target_var.name = source_var.name
-                target_var.type = source_var.type
+                target_var.type = source_var_type
+
+                # coping the variable targets over depending on the var source_var_type
+                if source_var_type == "SINGLE_PROP":
+
+                    for i, source_var_target in source_var.targets.items():
+                        target_var_target = target_var.targets[i]
+                        source_var_target_id = source_var_target.id
+                        # id type
+                        target_var_target.id_type = source_var_target.id_type
+                        # checking if the ID object is the shape key we are copying the shapes from and replacing it
+                        # with the target key shape
+                        if source_var_target_id == self.source.mesh.shape_keys:
+                            source_var_target_id = self.target.mesh.shape_keys
+
+                        # replacing the armature source armature with the target armature
+                        if source_var_target_id == self.source_arm:
+                            if self.target_arm:
+                                source_var_target_id = self.target_arm
+                        # id
+                        target_var_target.id = source_var_target_id
+
+                        # data path
+                        target_var_target.data_path = source_var_target.data_path
+
+
+
+                if source_var_type == "TRANSFORMS":
+
+                    for i, source_var_target in source_var.targets.items():
+                        target_var_target = target_var.targets[i]
+                        target_id = source_var_target.id
+                        # replacing the armature source armature with the target armature
+                        if target_id == self.source_arm:
+                            if self.target_arm:
+                                target_id = self.target_arm
+                        # id
+                        target_var_target.id = target_id
+                        # transform_type
+                        target_var_target.transform_type = source_var_target.transform_type
+                        # bone_target
+                        target_var_target.bone_target = source_var_target.bone_target
+                        # rotation_mode
+                        target_var_target.rotation_mode = source_var_target.rotation_mode
+                        # transform_space
+                        target_var_target.transform_space = source_var_target.transform_space
+                        # data path
+                        target_var_target.data_path = source_var_target.data_path
+
+                if source_var_type in ["ROTATION_DIFF", "LOC_DIFF"]:
+
+                    for i, source_var_target in source_var.targets.items():
+                        target_var_target = target_var.targets[i]
+                        target_id = source_var_target.id
+                        # replacing the armature source armature with the target armature
+                        if target_id == self.source_arm:
+                            if self.target_arm:
+                                target_id = self.target_arm
+                        # id
+                        target_var_target.id = target_id
+                        # transform_type
+                        target_var_target.transform_type = source_var_target.transform_type
+                        # bone_target
+                        target_var_target.bone_target = source_var_target.bone_target
+                        # data path
+                        target_var_target.data_path = source_var_target.data_path
+
             target_driver.expression = source_driver.expression
 
 
@@ -605,7 +770,9 @@ class MeshDataTransfer (object):
         if not current_object == self.target.obj:
             # print("Current objects was {}".format(current_object.name))
             bpy.context.view_layer.objects.active = self.target.obj
-
+        # get the source seam edges
+        source_seams = self.source.seam_edges
+        self.mark_seam_islands(self.source.obj)
 
         transfer_source = self.source.obj
         transfer_target = self.target.obj
@@ -639,6 +806,38 @@ class MeshDataTransfer (object):
         data_transfer.poly_mapping = poly_mapping
         bpy.ops.object.datalayout_transfer (modifier=data_transfer.name)
         bpy.ops.object.modifier_apply( modifier=data_transfer.name)
+
+        # re applying the old seams
+        self.source.seam_edges = source_seams
+
+    @staticmethod
+    def mark_seam_islands(obj):
+        """
+        Mark seam islands
+        :param obj:
+        :return:
+        """
+        current_object = bpy.context.object
+        current_mode = bpy.context.object.mode
+        if not current_object == obj:
+            if current_mode is not "OBJECT":
+                bpy.ops.object.mode_set (mode="OBJECT")
+                bpy.context.view_layer.objects.active = obj
+        if not bpy.context.object.mode == "EDIT":
+            bpy.ops.object.mode_set (mode="EDIT")
+        mesh = obj.data
+        verts = mesh.vertices
+        edges = mesh.edges
+        current_selection = [0] * len (verts)
+        verts.foreach_get ("select" , current_selection)
+        # select all edges
+        edges.foreach_set ("select" , [True] * len (edges))
+        # set seams from isalnds
+        bpy.ops.uv.seams_from_islands (mark_seams=True , mark_sharp=False)
+        verts.foreach_set("select", current_selection)
+        bpy.ops.object.mode_set(mode=current_mode)
+        bpy.context.view_layer.objects.active = current_object
+
 
     @staticmethod
     def transform_vertices_array(array, mat):
@@ -686,7 +885,7 @@ class MeshDataTransfer (object):
                 # project in the opposite direction if the ray misses
                 if not projection[0]:
                     projection = self.source.bvhtree.ray_cast (v.co, (v_normal*-1.0))
-            if projection[0]:
+            if  [0]:
                 for v_id in v_ids:
                     self.ray_casted[v_id] = projection[0]
                     self.missed_projections[v_id] = False
