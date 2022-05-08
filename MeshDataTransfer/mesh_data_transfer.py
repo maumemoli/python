@@ -627,6 +627,14 @@ class MeshDataTransfer (object):
                         # data path
                         target_var_target.data_path = source_var_target.data_path
 
+                        # transform_type
+                        target_var_target.transform_type = source_var_target.transform_type
+                        # bone_target
+                        target_var_target.bone_target = source_var_target.bone_target
+                        # rotation_mode
+                        target_var_target.rotation_mode = source_var_target.rotation_mode
+                        # transform_space
+                        target_var_target.transform_space = source_var_target.transform_space
 
 
                 if source_var_type == "TRANSFORMS":
