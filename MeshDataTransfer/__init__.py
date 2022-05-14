@@ -11,7 +11,7 @@ bl_info = {
     "description" : "This add on will transfer geometry data from one mesh to another based on 3 different spaces:"
                     " 'world, object, uv' also will tranfer UVs based on topology",
     "blender" : (2, 80, 0),
-    "version" : (1, 4, 0,),
+    "version" : (1, 4, 1,),
     "location" : "(Object Mode) Mesh > ObjectData > Mesh Data Transfer ",
     "warning" : "",
     "wiki_url": "",
@@ -224,6 +224,7 @@ def register():
         bpy.utils.register_class(cl)
 
     bpy.types.Object.mesh_data_transfer_object = PointerProperty (type=MeshDataSettings)
+    bpy.types.Object.expanded = bpy.props.BoolProperty(default=False)
     # bpy.types.Scene.mesh_data_transfer_global = PointerProperty (type=MeshDataGlobalSettings)
 
 def unregister():
@@ -233,6 +234,7 @@ def unregister():
         bpy.utils.unregister_class (cl)
 
     del bpy.types.Object.mesh_data_transfer_object
+    del bpy.types.Object.expanded
     # del bpy.types.Scene.mesh_data_transfer_global
 
 if __name__ == "__main__":
