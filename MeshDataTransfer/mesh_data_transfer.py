@@ -575,6 +575,35 @@ class MeshDataTransfer (object):
 
         return True
 
+    @staticmethod
+    def copy_f_curve(source, target):
+        """
+        Copy the f curve parameters from source to target
+        :param source: source curve
+        :param target: target curve
+        """
+        #remove modifiers
+        for mod in target.modifiers:
+            target.modifiers.remove(mod)
+
+        for mod in source.modifiers:
+            copy = target.modifiers.new(mod.type)
+            for prop in mod.bl_rna.properties:
+                if not prop.is_readonly:
+                    setattr(copy, prop.identifier, getattr(mod, prop.identifier))
+        target.extrapolation = source.extrapolation
+        target_keyframe_points = target.keyframe_points
+        source_keyframe_points = source.keyframe_points
+        target_keyframe_points.add(len(source_keyframe_points))
+
+        for sk, tk in zip(source_keyframe_points, target_keyframe_points):
+            tk.co = sk.co
+            tk.interpolation = sk.interpolation
+            tk.handle_left = sk.handle_left
+            tk.handle_left_type = sk.handle_left_type
+            tk.handle_right = sk.handle_right
+            tk.handle_right_type = sk.handle_right_type
+
     def transfer_shape_keys_drivers(self):
         """
         Transfer shape keys drivers.
@@ -594,7 +623,10 @@ class MeshDataTransfer (object):
             source_channel = source_f_curve.data_path.split(".")[-1]
             # create the target driver
 
-            target_driver = self.target.shape_keys[source_shape_key].driver_add(source_channel).driver
+            target_f_curve = self.target.shape_keys[source_shape_key].driver_add(source_channel)
+            # copying the f_curve
+            self.copy_f_curve(source_f_curve, target_f_curve)
+            target_driver = target_f_curve.driver
             # copying the data over to the target driver
             target_driver.type = source_driver.type
             # copying variables over
