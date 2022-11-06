@@ -10,8 +10,8 @@ bl_info = {
     "author" : "Maurizio Memoli",
     "description" : "This add on will transfer geometry data from one mesh to another based on 3 different spaces:"
                     " 'world, object, uv' also will tranfer UVs based on topology",
-    "blender" : (2, 80, 0),
-    "version" : (1, 4, 3,),
+    "blender" : (2, 93, 0),
+    "version" : (1, 4, 4,),
     "location" : "(Object Mode) Mesh > ObjectData > Mesh Data Transfer ",
     "warning" : "",
     "wiki_url": "",
