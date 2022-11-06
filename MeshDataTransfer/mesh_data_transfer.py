@@ -859,12 +859,15 @@ class MeshDataTransfer (object):
         """
         current_object = bpy.context.object
         current_mode = bpy.context.object.mode
+        scene = bpy.context.scene
         if not current_object == obj:
             if current_mode is not "OBJECT":
                 bpy.ops.object.mode_set (mode="OBJECT")
                 bpy.context.view_layer.objects.active = obj
         if not bpy.context.object.mode == "EDIT":
             bpy.ops.object.mode_set (mode="EDIT")
+        uv_sync_state = scene.tool_settings.use_uv_select_sync
+        scene.tool_settings.use_uv_select_sync =True
         mesh = obj.data
         verts = mesh.vertices
         edges = mesh.edges
@@ -873,8 +876,10 @@ class MeshDataTransfer (object):
         # select all edges
         edges.foreach_set ("select" , [True] * len (edges))
         # set seams from isalnds
+        bpy.ops.uv.mark_seam(clear=True)
         bpy.ops.uv.seams_from_islands (mark_seams=True , mark_sharp=False)
         verts.foreach_set("select", current_selection)
+        scene.tool_settings.use_uv_select_sync = uv_sync_state
         bpy.ops.object.mode_set(mode=current_mode)
         bpy.context.view_layer.objects.active = current_object
 
