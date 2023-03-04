@@ -248,6 +248,17 @@ class MeshData (object):
             return weights[array]
         return weights
 
+    def set_vertex_group_weights(self, group_name, weights):
+
+
+        #remove existing vertex group
+        v_group = self.vertex_groups.get(group_name)
+        group_weights = weights.flatten()
+        v_ids = np.nonzero(group_weights)[0]
+        for v_id in v_ids:
+            value = group_weights[v_id]
+            v_group.add((int(v_id),), value, "REPLACE")
+
     def set_vertex_groups_weights(self, weights, group_names):
         for i in range(weights.shape[0]):
             #remove existing vertex group
@@ -281,7 +292,10 @@ class MeshData (object):
         if not self.shape_keys:
             basis = self.obj.shape_key_add()
             basis.name = "Basis"
-        shape_key = self.obj.shape_key_add()
+        if shape_key_name in self.shape_keys_names:
+            shape_key = self.shape_keys[shape_key_name]
+        else:
+            shape_key = self.obj.shape_key_add()
         shape_key.name = shape_key_name
         shape_key.data.foreach_set("co", co.ravel())
         if activate:
@@ -450,6 +464,13 @@ class MeshData (object):
         co.shape = (v_count, 3)
         return co
 
+    def get_selected_verts(self):
+        v_count = len(self.mesh.vertices)
+        co = np.zeros(v_count, dtype=np.float32)
+        self.mesh.vertices.foreach_get("select", co)
+        co.shape = (v_count, 1)
+        return co
+
     def set_verts_position(self, co):
         self.mesh.vertices.foreach_set("co", co.ravel())
         self.mesh.update()
@@ -459,9 +480,10 @@ class MeshDataTransfer (object):
     def __init__(self, source, target, uv_space=False, deformed_source=False,
                  deformed_target=False, world_space=False, search_method="RAYCAST",
                  topology=False, vertex_group = None, invert_vertex_group = False, exclude_locked_groups = False,
-                 exclude_muted_shapekeys=False, snap_to_closest = False, transfer_drivers = False,
-                 source_arm =None, target_arm = None):
+                 exclude_muted_shapekeys=False, snap_to_closest = False, snap_to_closest_shape_key = False, transfer_drivers = False,
+                 source_arm =None, target_arm = None, restrict_to_selection = False):
         self.vertex_group = vertex_group
+        self.restrict_to_selection = restrict_to_selection
         self.uv_space = uv_space
         self.topology = topology
         self.world_space = world_space
@@ -476,6 +498,7 @@ class MeshDataTransfer (object):
         self.exclude_muted_shapekeys = exclude_muted_shapekeys
         self.exclude_locked_groups = exclude_locked_groups
         self.snap_to_closest = snap_to_closest
+        self.snap_to_closest_shapekey = snap_to_closest_shape_key
 
         self.missed_projections = None
         self.ray_casted = None
@@ -494,11 +517,20 @@ class MeshDataTransfer (object):
         get the vertex group weights for the filter
         :return:
         """
+
+        selection = None
+        if self.restrict_to_selection:
+            selection = self.target.get_selected_verts()
         if self.vertex_group:
             v_group = self.target.get_vertex_group_weights(self.vertex_group)
             if self.invert_vertex_group:
                 v_group = 1.0 - v_group
+            if self.restrict_to_selection:
+                v_group = v_group * selection
             return v_group
+        else:
+            return selection
+
 
 
     def free(self):
@@ -538,20 +570,27 @@ class MeshDataTransfer (object):
             return
         undeformed_verts = self.target.get_verts_position()
         base_coords = self.source.get_verts_position()
-        base_transferred_position = self.get_transferred_vert_coords(base_coords)
+        if self.search_method == "TOPOLOGY":
+            base_transferred_position = base_coords
+        else:
+            base_transferred_position = self.get_transferred_vert_coords(base_coords)
         if self.world_space:
             mat = np.array(self.target.obj.matrix_world.inverted()) @  np.array(self.source.obj.matrix_world)
             base_transferred_position = self.transform_vertices_array(base_transferred_position, mat)
         base_transferred_position = np.where (self.missed_projections , undeformed_verts , base_transferred_position)
         masked_vertices = self.get_vertices_mask ()
+        target_shape_keys = self.target.get_shape_keys_vert_pos()
         for sk in shape_keys:
             sk_points = shape_keys[sk]
             if self.world_space:
                 mat =np.array(self.source.obj.matrix_world)
                 sk_points = self.transform_vertices_array(sk_points, mat)
-            transferred_sk = self.get_transferred_vert_coords(sk_points)
+            if self.search_method == "TOPOLOGY":
+                transferred_sk = sk_points
+            else:
+                transferred_sk = self.get_transferred_vert_coords(sk_points)
             #snap to vertices
-            if self.snap_to_closest:
+            if self.snap_to_closest_shapekey:
                 transferred_sk = self.snap_coords_to_source_verts(transferred_sk, sk_points)
             if self.world_space:
                 mat = np.array(self.target.obj.matrix_world.inverted())
@@ -565,6 +604,11 @@ class MeshDataTransfer (object):
             # filter on vertex group
             if isinstance (masked_vertices , (np.ndarray , np.generic)):
                 delta = transferred_sk * masked_vertices
+                if target_shape_keys:
+                    if sk in target_shape_keys:
+                        inverted_masked_vertices = 1.0 - masked_vertices
+                        old_delta = (target_shape_keys[sk] - undeformed_verts) * inverted_masked_vertices
+                        delta = old_delta + delta
                 transferred_sk = undeformed_verts + delta
             else:
                 transferred_sk = transferred_sk + undeformed_verts
@@ -710,7 +754,7 @@ class MeshDataTransfer (object):
                         target_var_target.data_path = source_var_target.data_path
 
             target_driver.expression = source_driver.expression
-
+        return True
 
 
     def transfer_vertex_groups(self):
@@ -718,6 +762,9 @@ class MeshDataTransfer (object):
         weights_names = self.source.get_vertex_groups_names(ignore_locked=self.exclude_locked_groups)
         if not weights_names:
             return
+        # getting existing target group weights
+        existing_target_weights = self.target.get_vertex_groups_weights(ignore_locked=self.exclude_locked_groups)
+        existing_target_weights_names = self.target.get_vertex_groups_names(ignore_locked=self.exclude_locked_groups)
         #setting up destination array
         target_weights_shape = ( len(weights_names), self.target.v_count)
         target_weights = np.zeros((target_weights_shape[0] * target_weights_shape[1]), dtype=np.float32)
@@ -725,17 +772,37 @@ class MeshDataTransfer (object):
         masked_vertices = self.get_vertices_mask ()
         #unpacking array
         for i in range(len(weights_names)):
-            source_weight = np.zeros((source_weights[i].shape[0]*3), dtype=np.float32)
-            source_weight.shape = (source_weights[i].shape[0], 3)
-            source_weight[:, 0] = source_weights[i]
-            source_weight[:, 1] = source_weights[i]
-            source_weight[:, 2] = source_weights[i]
-            transferred_weights = self.get_transferred_vert_coords(source_weight)
-            # filter on vertex group
-            if isinstance (masked_vertices , (np.ndarray , np.generic)):
-                transferred_weights = transferred_weights * masked_vertices
+            weight_name = weights_names[i]
+            # checking if the current vertex group is the masked one.
+            if self.search_method == "TOPOLOGY":
+                transferred_weights = self.source.get_vertex_group_weights(weight_name).flatten()
+            else:
+                source_weight = np.zeros((source_weights[i].shape[0]*3), dtype=np.float32)
+                source_weight.shape = (source_weights[i].shape[0], 3)
+                source_weight[:, 0] = source_weights[i]
+                source_weight[:, 1] = source_weights[i]
+                source_weight[:, 2] = source_weights[i]
 
-            target_weights[i] = transferred_weights[:, 0]
+                transferred_weights = self.get_transferred_vert_coords(source_weight)[:,0]
+
+            # filter on vertex group
+            # blending to existing weight map
+            existing_weight_map = None
+            if isinstance (masked_vertices , (np.ndarray , np.generic)):
+
+                if weight_name in existing_target_weights_names:
+                    target_weight_index = existing_target_weights_names.index(weight_name)
+                    existing_weight_map = existing_target_weights[target_weight_index]
+                    existing_weight_map.reshape(transferred_weights.shape)
+                    inverted_masked_vertices = 1.0 - masked_vertices
+                    inverted_masked_vertices = inverted_masked_vertices.flatten()
+                    existing_weight_map = existing_weight_map * inverted_masked_vertices
+                transferred_weights = transferred_weights * masked_vertices.flatten()
+
+            if isinstance(existing_weight_map, (np.ndarray , np.generic)):
+                transferred_weights = np.sum ([transferred_weights, existing_weight_map], axis=0)
+
+            target_weights[i] = transferred_weights
         self.target.set_vertex_groups_weights(target_weights, weights_names)
         return True
 
@@ -747,7 +814,10 @@ class MeshDataTransfer (object):
         transfer_coord = self.source.get_verts_position()
 
         #transferred_position = self.calculate_barycentric_location(sorted_coords, self.barycentric_coords)
-        transferred_position = self.get_transferred_vert_coords(transfer_coord)
+        if self.search_method == "TOPOLOGY":
+            transferred_position = transfer_coord
+        else:
+            transferred_position = self.get_transferred_vert_coords(transfer_coord)
         if self.snap_to_closest:
             transferred_position = self.snap_coords_to_source_verts (transferred_position , transfer_coord)
 
@@ -757,26 +827,38 @@ class MeshDataTransfer (object):
 
 
         undeformed_verts = self.target.get_verts_position()
+        if not  self.search_method == "TOPOLOGY":
+            # filetring missing positions. We Don't need that if we are doing a topology transfer
+            transferred_position = np.where(self.missed_projections, undeformed_verts, transferred_position )
 
-        transferred_position = np.where(self.missed_projections, undeformed_verts, transferred_position )
-        # filtering through vertex
-        masked_vertices = self.get_vertices_mask ()
-
-
-        if isinstance(masked_vertices, (np.ndarray, np.generic)):
-            delta =transferred_position - undeformed_verts
-            delta = delta * masked_vertices
-            transferred_position = undeformed_verts + delta
 
 
         return transferred_position
 
     def transfer_vertex_position(self, as_shape_key=False):
 
+
         transferred_position = self.get_projected_vertices_on_source()
+        # filtering through vertex
+        masked_vertices = self.get_vertices_mask ()
+
+        if isinstance(masked_vertices, (np.ndarray, np.generic)):
+            undeformed_verts = self.target.get_verts_position()
+            delta =transferred_position- undeformed_verts
+            delta = delta * masked_vertices
+            transferred_position = undeformed_verts + delta
 
         if as_shape_key:
             shape_key_name = "{}.Transferred".format(self.source.obj.name)
+            target_shape_keys = self.target.get_shape_keys_vert_pos()
+            if target_shape_keys:
+                if shape_key_name in target_shape_keys and isinstance(masked_vertices, (np.ndarray, np.generic)):
+                    non_deformed = self.target.get_verts_position()
+                    existing_shape_key_vertex_pos = target_shape_keys[shape_key_name] -non_deformed
+                    inverted_mask = 1.0 - masked_vertices
+                    existing_shape_key_vertex_pos = existing_shape_key_vertex_pos * inverted_mask
+                    transferred_position = existing_shape_key_vertex_pos + transferred_position
+
             self.target.set_position_as_shape_key(shape_key_name=shape_key_name,co=transferred_position, activate=True)
         else:
             self.target.set_verts_position(transferred_position)
@@ -798,6 +880,9 @@ class MeshDataTransfer (object):
 
         return transferred_position
 
+
+
+
     def transfer_uvs(self):
         """
         will transfer UVs using the data transfer
@@ -816,18 +901,28 @@ class MeshDataTransfer (object):
 
         transfer_source = self.source.obj
         transfer_target = self.target.obj
-        loop_mapping =  'POLYINTERP_NEAREST'
-        poly_mapping = 'POLYINTERP_PNORPROJ'
-        if self.topology:
+        if self.search_method == "CLOSEST":
+            loop_mapping = 'NEAREST_NORMAL'
+            poly_mapping = 'NEAREST'
+            edge_mapping = "VERT_NEAREST"
+        if self.search_method == "RAYCAST":
+            poly_mapping = 'POLYINTERP_PNORPROJ'
+            loop_mapping = 'NEAREST_POLYNOR'
+            edge_mapping = "NEAREST"
+        if self.search_method == "TOPOLOGY":
             loop_mapping = "TOPOLOGY"
             poly_mapping = "TOPOLOGY"
+            edge_mapping = "TOPOLOGY"
         data_transfer = self.target.obj.modifiers.new (name="Data Transfer" , type="DATA_TRANSFER")
         data_transfer.use_object_transform = self.world_space
+        data_transfer.data_types_edges = {"SEAM"}
         data_transfer.object = transfer_source
         data_transfer.use_loop_data = True
         # options: 'TOPOLOGY', 'NEAREST_NORMAL', 'NEAREST_POLYNOR',
         # 'NEAREST_POLY', 'POLYINTERP_NEAREST', 'POLYINTERP_LNORPROJ'
-
+        data_transfer.use_edge_data = True
+        # EDGEINTERP_VNORPROJ
+        data_transfer.edge_mapping = edge_mapping
         data_transfer.loop_mapping = loop_mapping
         # options ('CUSTOM_NORMAL', 'VCOL', 'UV')
         data_transfer.data_types_loops = {"UV" , }
@@ -840,15 +935,22 @@ class MeshDataTransfer (object):
         data_transfer.layers_uv_select_dst = dest_active_uv.name
 
         # options: ('TOPOLOGY', 'NEAREST', 'NORMAL', 'POLYINTERP_PNORPROJ')
-        if self.vertex_group:
-            data_transfer.vertex_group = self.vertex_group
-            data_transfer.invert_vertex_group = self.invert_vertex_group
+        if self.vertex_group or self.restrict_to_selection:
+            masked_vertex = self.get_vertices_mask()
+            mask_v_group = self.target.obj.vertex_groups.new(name= "UVT")
+            self.target.set_vertex_group_weights(mask_v_group.name, masked_vertex)
+            data_transfer.vertex_group = mask_v_group.name
+            # data_transfer.invert_vertex_group = self.invert_vertex_group
+
         data_transfer.poly_mapping = poly_mapping
         bpy.ops.object.datalayout_transfer (modifier=data_transfer.name)
         bpy.ops.object.modifier_apply( modifier=data_transfer.name)
-
-        # re applying the old seams
         self.source.seam_edges = source_seams
+        if self.vertex_group or self.restrict_to_selection:
+            self.target.vertex_groups.remove(mask_v_group)
+        # re applying the old seams
+
+        return True
 
     @staticmethod
     def mark_seam_islands(obj):
@@ -930,7 +1032,7 @@ class MeshDataTransfer (object):
                 # project in the opposite direction if the ray misses
                 if not projection[0]:
                     projection = self.source.bvhtree.ray_cast (v.co, (v_normal*-1.0))
-            if  [0]:
+            if projection[0]:
                 for v_id in v_ids:
                     self.ray_casted[v_id] = projection[0]
                     self.missed_projections[v_id] = False
