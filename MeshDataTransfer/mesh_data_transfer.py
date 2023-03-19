@@ -119,6 +119,127 @@ class GreasePencilData(object):
 
         return bm
 
+class TopologyData (object):
+    """
+    This class will order the topology based on the selected face and the active mesh
+    """
+
+    def __init__(self, obj):
+        self.obj = obj
+        self.mesh = obj.data
+
+
+        self.vertex_map = {}  # the corrispondance map of the uv_vertices to the mesh vert id
+
+        self.loop_totals = None
+        self.loop_starts = None
+        self.face_loops = None
+
+        self.face_edge_loops = None
+
+        self.edges = None
+        self.selected_face = None
+
+        self.get_data()
+        # initializing bmesh
+        self.bmesh = bmesh.new()
+        self.bmesh.from_mesh(self.mesh)
+        self.active_edge = None
+        active = self.bmesh.select_history.active
+        if isinstance(active, bmesh.types.BMEdge):
+            self.active_edge = active.index
+
+        self.parsed = None
+
+    @property
+    def selected_faces(self):
+        mesh = self.mesh
+        f_count = len(mesh.polygons)
+        selected_faces = np.zeros(f_count, dtype=np.int64)
+        mesh.polygons.foreach_get("select", selected_faces)
+        selected_faces = np.where(selected_faces == 1)
+        return selected_faces
+
+    def get_face_vertices(self, face_id):
+        start = self.loop_starts[face_id]
+        end = start + self.loop_totals[face_id]
+        return self.face_loops[start:end]
+
+    def get_face_edges(self, face_id):
+        """
+        return the edges sorted accordingly to the face draw order
+        """
+        face_vertices = self.get_face_vertices(face_id)
+        offset_face_vertices = np.roll(face_vertices.ravel(), -1)
+        face_edges = np.ravel([face_vertices, offset_face_vertices], 'F')
+        face_edges = face_edges.reshape(int(face_edges.size / 2), 2)
+        return face_edges
+
+    def roll_to_edge(self, face_id, edge):
+        face_edges = self.get_face_edges(face_id)
+        face_vertices = self.get_face_vertices(face_id)
+        edge_index = np.where((face_edges == edge).all(axis=1))[0]
+        if edge_index.size == 0:
+            edge_index = np.where((face_edges == edge[::-1]).all(axis=1))[0]
+        edge = face_edges[edge_index].flatten()[0]
+        face_index =  np.where((face_vertices == edge))[0]
+        rolled_face = np.roll(face_vertices, -face_index, axis=0)
+
+        return rolled_face
+
+    # def get_shared_faces(self, face_id):
+    #     face_edges = self.get_face_edges(face_id)
+    #     for edge in face_edges:
+
+    def get_data(self):
+
+        mesh = self.mesh
+        f_count = len(mesh.polygons)
+        loop_starts = np.zeros(f_count, dtype=np.int64)
+        mesh.polygons.foreach_get("loop_start", loop_starts)
+
+        loop_totals = np.zeros(f_count, dtype=np.int64)
+        mesh.polygons.foreach_get("loop_total", loop_totals)
+
+        loops_count = len(mesh.loops)
+        face_loops = np.zeros(loops_count, dtype=np.int64)
+        mesh.loops.foreach_get("vertex_index", face_loops)
+
+        edge_count = len(mesh.edges)
+        edges = np.zeros((edge_count * 2), dtype=np.int64)
+        mesh.edges.foreach_get("vertices", edges)
+        edges = edges.reshape(int(edges.size/2), 2)
+
+
+
+
+        self.loop_totals = loop_totals
+        self.face_loops = face_loops
+        self.loop_starts = loop_starts
+        self.edges = edges
+
+        edge_face_total = np.sum(loop_totals)
+
+        faces_edges_count = int(edge_face_total*2)
+        faces_edges_loops = np.zeros(faces_edges_count, dtype=np.int64)
+        start = 0
+
+        for i in range(len(mesh.polygons)):
+            face_edges = self.get_face_edges(i).flatten()
+            end = start + face_edges.size
+            faces_edges_loops[start:end] = face_edges
+            start += face_edges.size
+        faces_edges_loops.shape = (int(len(faces_edges_loops)/2),2 )
+        self.face_edge_loops = faces_edges_loops
+
+
+        if self.selected_faces:
+            self.selected_face = self.selected_faces[0]
+
+    def free(self):
+        if self.bmesh:
+            self.bmesh.free()
+
 
 class MeshData (object):
     def __init__(self, obj, deformed=False, world_space=False, uv_space=False, triangulate = True):
@@ -902,7 +1023,7 @@ class MeshDataTransfer (object):
         transfer_source = self.source.obj
         transfer_target = self.target.obj
         if self.search_method == "CLOSEST":
-            loop_mapping = 'NEAREST_NORMAL'
+            loop_mapping = 'POLYINTERP_NEAREST'
             poly_mapping = 'NEAREST'
             edge_mapping = "VERT_NEAREST"
         if self.search_method == "RAYCAST":
@@ -943,11 +1064,11 @@ class MeshDataTransfer (object):
             # data_transfer.invert_vertex_group = self.invert_vertex_group
 
         data_transfer.poly_mapping = poly_mapping
-        bpy.ops.object.datalayout_transfer (modifier=data_transfer.name)
-        bpy.ops.object.modifier_apply( modifier=data_transfer.name)
-        self.source.seam_edges = source_seams
-        if self.vertex_group or self.restrict_to_selection:
-            self.target.vertex_groups.remove(mask_v_group)
+        # bpy.ops.object.datalayout_transfer (modifier=data_transfer.name)
+        # bpy.ops.object.modifier_apply( modifier=data_transfer.name)
+        # self.source.seam_edges = source_seams
+        # if self.vertex_group or self.restrict_to_selection:
+        #     self.target.vertex_groups.remove(mask_v_group)
         # re applying the old seams
 
         return True
