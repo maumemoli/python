@@ -258,7 +258,7 @@ class MeshData (object):
         for v_id in v_ids:
             value = group_weights[v_id]
             v_group.add((int(v_id),), value, "REPLACE")
-
+        return v_group
     def set_vertex_groups_weights(self, weights, group_names):
         for i in range(weights.shape[0]):
             #remove existing vertex group
@@ -902,13 +902,13 @@ class MeshDataTransfer (object):
         transfer_source = self.source.obj
         transfer_target = self.target.obj
         if self.search_method == "CLOSEST":
-            loop_mapping = 'NEAREST_NORMAL'
+            loop_mapping = 'POLYINTERP_NEAREST'
             poly_mapping = 'NEAREST'
-            edge_mapping = "VERT_NEAREST"
+            edge_mapping = "EDGEINTERP_VNORPROJ"
         if self.search_method == "RAYCAST":
+            loop_mapping = 'POLYINTERP_LNORPROJ'
             poly_mapping = 'POLYINTERP_PNORPROJ'
-            loop_mapping = 'NEAREST_POLYNOR'
-            edge_mapping = "NEAREST"
+            edge_mapping = "EDGEINTERP_VNORPROJ"
         if self.search_method == "TOPOLOGY":
             loop_mapping = "TOPOLOGY"
             poly_mapping = "TOPOLOGY"
@@ -937,8 +937,10 @@ class MeshDataTransfer (object):
         # options: ('TOPOLOGY', 'NEAREST', 'NORMAL', 'POLYINTERP_PNORPROJ')
         if self.vertex_group or self.restrict_to_selection:
             masked_vertex = self.get_vertices_mask()
-            mask_v_group = self.target.obj.vertex_groups.new(name= "UVT")
-            self.target.set_vertex_group_weights(mask_v_group.name, masked_vertex)
+            mask_v_group = self.target.obj.vertex_groups.new()
+            group_name = mask_v_group.name
+            # vgroup class get lost so getting the v group instance from mesh data
+            self.target.set_vertex_group_weights(group_name, masked_vertex)
             data_transfer.vertex_group = mask_v_group.name
             # data_transfer.invert_vertex_group = self.invert_vertex_group
 
@@ -947,7 +949,8 @@ class MeshDataTransfer (object):
         bpy.ops.object.modifier_apply( modifier=data_transfer.name)
         self.source.seam_edges = source_seams
         if self.vertex_group or self.restrict_to_selection:
-            self.target.vertex_groups.remove(mask_v_group)
+            v_group = self.target.obj.vertex_groups.get(group_name)
+            self.target.obj.vertex_groups.remove(v_group)
         # re applying the old seams
 
         return True
