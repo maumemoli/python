@@ -611,6 +611,9 @@ class MeshDataTransfer (object):
         self.deformed_target = deformed_target
         self.deformed_source = deformed_source
         self.search_method = search_method
+        if self.uv_space:
+            # automatically switching to closest if UV samlpes
+            self.search_method = "CLOSEST"
         self.source = MeshData(source, uv_space=uv_space, deformed=deformed_source , world_space=world_space)
         self.source.get_mesh_data()
         self.target = MeshData(target, uv_space=uv_space, deformed=deformed_target , world_space=world_space)
