@@ -2,19 +2,19 @@
 import bpy
 import os
 script_dir = os.path.dirname(os.path.realpath(__file__))
-import sys
-sys.path.append(script_dir)
-print("*****RELOADED*****")
-from importlib import reload
-import mesh_data_transfer as md
-reload(md)
-import operators as op
-reload(op)
-print("****************RELOADED MODULES**************")
+# import sys
+# sys.path.append(script_dir)
+# print("*****RELOADED*****")
+# from importlib import reload
+# import mesh_data_transfer as md
+# reload(md)
+# import operators as op
+# reload(op)
+# print("****************RELOADED MODULES**************")
 
 from bpy.types import (PropertyGroup)
 from bpy.props import (PointerProperty)
-from operators import ( TransferShapeKeyDrivers, TransferMeshData, MapTopology)
+from .operators import ( TransferShapeKeyDrivers, TransferMeshData, MapTopology)
 
 bl_info = {
     "name" : "MeshDataTransfer",
@@ -22,7 +22,7 @@ bl_info = {
     "description" : "This add on will transfer geometry data from one mesh to another based on 3 different spaces:"
                     " 'world, object, uv' also will tranfer UVs based on topology",
     "blender" : (2, 93, 0),
-    "version" : (2, 0, 2,),
+    "version" : (2, 0, 3,),
     "location" : "(Object Mode) Mesh > ObjectData > Mesh Data Transfer ",
     "warning" : "",
     "wiki_url": "",

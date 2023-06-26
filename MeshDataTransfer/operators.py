@@ -1,6 +1,6 @@
 import bpy
 
-from mesh_data_transfer import MeshDataTransfer, TopologyData
+from .mesh_data_transfer import MeshDataTransfer, TopologyData
 import os
 
 
