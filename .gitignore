@@ -1,4 +1,5 @@
 /MeshDataTransfer/link.bat
+/MeshDataTransfer/__pychache__/
 *.pyc
 /release/
 /PES_Face_Hair_Modifier/
