@@ -1,1 +1,5 @@
 /MeshDataTransfer/link.bat
+*.pyc
+/release/
+/PES_Face_Hair_Modifier/
+/speedsculpt_2_80_v_0_1_17/
