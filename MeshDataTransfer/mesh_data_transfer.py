@@ -616,6 +616,8 @@ class MeshDataTransfer (object):
         target_shape_keys = self.target.get_shape_keys_vert_pos()
         for sk in shape_keys:
             sk_points = shape_keys[sk]
+            slider_min = self.source.shape_keys[sk].slider_min
+            slider_max = self.source.shape_keys[sk].slider_max
             if self.world_space:
                 mat =np.array(self.source.obj.matrix_world)
                 sk_points = self.transform_vertices_array(sk_points, mat)
@@ -649,6 +651,8 @@ class MeshDataTransfer (object):
             else:
                 transferred_sk = transferred_sk + undeformed_verts
             self.target.set_position_as_shape_key(shape_key_name=sk, co=transferred_sk)
+            self.target.shape_keys[sk].slider_min = slider_min
+            self.target.shape_keys[sk].slider_max = slider_max
             # transfer drivers
         if self.transfer_drivers:
             self.transfer_shape_keys_drivers()
