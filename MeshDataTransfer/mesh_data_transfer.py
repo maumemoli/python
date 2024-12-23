@@ -23,102 +23,6 @@ MeshData:
 
 '''
 
-class GreasePencilData(object):
-    def __init__(self, obj, deformed=False, world_space=False, uv_space=False, triangulate = True):
-        self.obj = obj
-        self.grease_pencil = obj.data
-        self.deformed = deformed
-        self.world_space = world_space
-        self.uv_space = uv_space
-
-        self.triangulate = triangulate
-        self.bvhtree = None  # bvhtree for point casting
-        self.transfer_bmesh = None
-
-        self.vertex_map = {}  # the corrispondance map of the uv_vertices to the mesh vert id
-
-    def free(self):
-        if self.transfer_bmesh:
-            self.transfer_bmesh.free()
-        if self.bvhtree:
-            self.bvhtree = None
-
-    @property
-    def active_strokes(self):
-        strokes = list()
-        for layer in self.grease_pencil.layers:
-            active_frame = layer.active_frame
-            for stroke in active_frame.strokes:
-                strokes.append(stroke)
-        return strokes
-
-    @property
-    def active_points(self):
-        points = list()
-        for stroke in self.active_strokes:
-            for point in stroke.points:
-                points.append(point)
-        return points
-
-    @property
-    def v_count(self):
-        return len(self.active_points)
-
-    @property
-    def vertex_groups(self):
-        return self.obj.vertex_groups
-
-    def get_locked_vertex_groups_array(self):
-        v_groups =self.vertex_groups
-        if not v_groups:
-            return
-        array = []
-        for g in v_groups:
-            array.append(not g.lock_weight)
-        return array
-
-    def get_vertex_groups_names(self, ignore_locked = False):
-        if not self.vertex_groups:
-            return
-        group_names=list()
-        for group in self.vertex_groups:
-            group_names.append(group.name)
-        if ignore_locked:
-            filter_array = self.get_locked_vertex_groups_array()
-            for i in range(len(filter_array)):
-                if not filter_array[i]:
-                    group_names.pop(i)
-        return group_names
-
-
-    def generate_bmesh(self, deformed=True, world_space=True):
-        """
-        Create a bmesh from the mesh.
-        This will capture the deformers too.
-        :param deformed:
-        :param transformed:
-        :param object:
-        :return:
-        """
-        bm = bmesh.new ()
-        if deformed:
-            depsgraph = bpy.context.evaluated_depsgraph_get ()
-            ob_eval = self.obj.evaluated_get (depsgraph)
-            mesh = ob_eval.to_mesh ()
-            bm.from_mesh (mesh)
-            ob_eval.to_mesh_clear ()
-        else:
-            mesh = self.obj.to_mesh ()
-            bm.from_mesh (mesh)
-        if world_space:
-            bm.transform (self.obj.matrix_world)
-            self.evalued_in_world_coords = True
-        else:
-            self.evalued_in_world_coords = False
-        bm.verts.ensure_lookup_table ()
-
-        return bm
-
 class TopologyData (object):
     """
     This class will order the topology based on the selected face and the active mesh
@@ -554,8 +458,6 @@ class MeshData (object):
             bpy.data.meshes.remove (temp_mesh)
             shape_key.value = 0.0
             return co
-
-
         v_count = len (self.mesh.vertices)
         co = np.zeros (v_count * 3, dtype=np.float32)
         shape_key.data.foreach_get("co", co)
@@ -633,7 +535,9 @@ class MeshDataTransfer (object):
 
         self.transfer_drivers = transfer_drivers
         self.cast_verts()
+        self.has_zero_area_faces = self.check_zero_area_triangles(self.hit_faces)
         self.barycentric_coords = self.get_barycentric_coords(self.ray_casted, self.hit_faces)
+
 
         self.source_arm = source_arm
         self.target_arm = target_arm
@@ -700,6 +604,10 @@ class MeshDataTransfer (object):
             base_transferred_position = base_coords
         else:
             base_transferred_position = self.get_transferred_vert_coords(base_coords)
+            if self.has_zero_area_faces:
+                base_transferred_position = np.where(np.isnan(base_transferred_position),
+                                                     undeformed_verts,
+                                                     base_transferred_position)
         if self.world_space:
             mat = np.array(self.target.obj.matrix_world.inverted()) @  np.array(self.source.obj.matrix_world)
             base_transferred_position = self.transform_vertices_array(base_transferred_position, mat)
@@ -723,6 +631,8 @@ class MeshDataTransfer (object):
                 transferred_sk = self.transform_vertices_array (transferred_sk , mat)
 
             transferred_sk = np.where(self.missed_projections, undeformed_verts, transferred_sk)
+            if self.has_zero_area_faces:
+                transferred_sk = np.where(np.isnan(transferred_sk), undeformed_verts, transferred_sk)
             # extracting deltas
             transferred_sk = transferred_sk - base_transferred_position
 
@@ -956,8 +866,9 @@ class MeshDataTransfer (object):
         if not  self.search_method == "TOPOLOGY":
             # filetring missing positions. We Don't need that if we are doing a topology transfer
             transferred_position = np.where(self.missed_projections, undeformed_verts, transferred_position )
-
-
+            # filtering the nan values
+        if self.has_zero_area_faces:
+            transferred_position = np.where(np.isnan(transferred_position), undeformed_verts, transferred_position)
 
         return transferred_position
 
@@ -1181,6 +1092,31 @@ class MeshDataTransfer (object):
         return self.ray_casted, self.hit_faces, self.related_ids
 
     @staticmethod
+    def check_zero_area_triangles(triangles):
+        """
+        Check if triangles have zero area.
+
+        :param triangles: Nx3x3 array where each row represents a triangle's vertices
+        :return: Boolean array indicating zero-area triangles
+        """
+        # Compute edge vectors
+        v1 = triangles[:, 1] - triangles[:, 0]  # Edge vector P2 - P1
+        v2 = triangles[:, 2] - triangles[:, 0]  # Edge vector P3 - P1
+
+        # Compute the cross product of edge vectors
+        area_vectors = np.cross(v1, v2)
+
+        # Compute the magnitude of the area vectors (twice the triangle area)
+        area_magnitudes = np.linalg.norm(area_vectors, axis=1)
+
+        # Identify zero-area triangles (area magnitude == 0)
+        zero_area = np.isclose(area_magnitudes, 0)
+        # return True if there are zero area triangles
+        return zero_area.any()
+
+
+
+    @staticmethod
     def get_barycentric_coords(verts_co, triangles):
         """
         Calculate the barycentric coordinates
@@ -1188,7 +1124,6 @@ class MeshDataTransfer (object):
         :param triangles:
         :return:
         """
-
         barycentric_coords = verts_co.copy()
         # calculate vectors from point f to vertices p1, p2 and p3:
 
@@ -1213,7 +1148,8 @@ class MeshDataTransfer (object):
             (va2 * main_triangle_areas).sum(1))
         barycentric_coords[:, 2] = np.sqrt((va3 * va3).sum (axis=1)) / a * np.sign (
             (va3 * main_triangle_areas).sum(1))
-        return (barycentric_coords)
+
+        return barycentric_coords
 
     @staticmethod
     def calculate_barycentric_location(uv_coords , coords):

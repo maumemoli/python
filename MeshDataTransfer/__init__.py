@@ -1,7 +1,7 @@
 
 import bpy
-import os
-script_dir = os.path.dirname(os.path.realpath(__file__))
+# import os
+# script_dir = os.path.dirname(os.path.realpath(__file__))
 # import sys
 # sys.path.append(script_dir)
 # print("*****RELOADED*****")
@@ -263,14 +263,10 @@ class DATA_PT_mesh_data_transfer(bpy.types.Panel):
         #
 
         # Rigging utilities
-        utility_box_layout = main_box_layout.box()
-        utility_label = utility_box_layout.row(align=True)
-        utility_label.prop(obj, "expanded",
-            icon="TRIA_DOWN" if obj.expanded else "TRIA_RIGHT",
-            icon_only=True, emboss=False, expand=False)
-        utility_label.label(text="RIGGING HELPERS")
-        utility_label.alignment = "LEFT"
-        if obj.expanded:
+        header, utility_box_panel = main_box_layout.panel("rigging_helpers", default_closed=True)
+        header.label(text="RIGGING HELPERS")
+        if utility_box_panel is not None:
+            utility_box_layout = utility_box_panel.box()
             #armature picker layout
             source_arm_picker_box_layout = utility_box_layout.box()
             source_arm_picker_box_layout.prop_search(ob_prop, "arm_source", context.scene, "objects", text="Source Armature")

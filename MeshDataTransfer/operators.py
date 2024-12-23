@@ -54,7 +54,9 @@ class TransferShapeKeyDrivers(bpy.types.Operator):
                                          exclude_muted_shapekeys = exclude_muted_shapekeys,
                                          snap_to_closest=snap_to_closest, transfer_drivers= False,
                                          source_arm= source_arm, target_arm= target_arm)
-
+        if transfer_data.has_zero_area_faces:
+            self.report({'WARNING'}, 'Zero area faces detected in the source mesh. '
+                                     'Fix the source mesh for cleaner transfer.')
         transferred = transfer_data.transfer_shape_keys_drivers()
         transfer_data.free()
         if not transferred:
@@ -119,6 +121,9 @@ class TransferMeshData(bpy.types.Operator):
                                          exclude_muted_shapekeys= exclude_muted_shapekeys,
                                          snap_to_closest_shape_key=snap_to_closest_shapekey,
                                          exclude_locked_groups= exclude_locked_groups)
+        if transfer_data.has_zero_area_faces:
+            self.report({'WARNING'}, 'Zero area faces detected in the source mesh. '
+                                     'Fix the source mesh for cleaner transfer.')
 
         attribute_to_transfer = active_prop.attributes_to_transfer
         if attribute_to_transfer == "SHAPE":
