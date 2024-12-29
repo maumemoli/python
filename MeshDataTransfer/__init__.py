@@ -22,7 +22,7 @@ bl_info = {
     "description" : "This add on will transfer geometry data from one mesh to another based on 3 different spaces:"
                     " 'world, object, uv' also will tranfer UVs based on topology",
     "blender" : (2, 93, 0),
-    "version" : (2, 0, 6,),
+    "version" : (2, 0, 7,),
     "location" : "(Object Mode) Mesh > ObjectData > Mesh Data Transfer ",
     "warning" : "",
     "wiki_url": "",
@@ -261,12 +261,25 @@ class DATA_PT_mesh_data_transfer(bpy.types.Panel):
         # transfer_layout.operator("object.map_topology", text="Map Topology",
         #                                         icon="MOD_DATA_TRANSFER")
         #
+        # let's check the version of blender
+        if bpy.app.version <= (4, 00, 0):
+            utility_box_layout = main_box_layout.box()
+            utility_label = utility_box_layout.row(align=True)
+            utility_label.prop(obj, "expanded",
+                               icon="TRIA_DOWN" if obj.expanded else "TRIA_RIGHT",
+                               icon_only=True, emboss=False, expand=False)
+            utility_label.label(text="RIGGING HELPERS")
+            utility_label.alignment = "LEFT"
+            expanded = obj.expanded
 
-        # Rigging utilities
-        header, utility_box_panel = main_box_layout.panel("rigging_helpers", default_closed=True)
-        header.label(text="RIGGING HELPERS")
-        if utility_box_panel is not None:
+        else:
+            # Rigging utilities
+            header, utility_box_panel = main_box_layout.panel("rigging_helpers", default_closed=True)
+            header.label(text="RIGGING HELPERS")
             utility_box_layout = utility_box_panel.box()
+            expanded = utility_box_panel is not None
+
+        if expanded:
             #armature picker layout
             source_arm_picker_box_layout = utility_box_layout.box()
             source_arm_picker_box_layout.prop_search(ob_prop, "arm_source", context.scene, "objects", text="Source Armature")
