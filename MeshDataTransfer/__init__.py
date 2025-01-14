@@ -22,7 +22,7 @@ bl_info = {
     "description" : "This add on will transfer geometry data from one mesh to another based on 3 different spaces:"
                     " 'world, object, uv' also will tranfer UVs based on topology",
     "blender" : (2, 93, 0),
-    "version" : (2, 0, 7,),
+    "version" : (2, 0, 8,),
     "location" : "(Object Mode) Mesh > ObjectData > Mesh Data Transfer ",
     "warning" : "",
     "wiki_url": "",
@@ -262,6 +262,7 @@ class DATA_PT_mesh_data_transfer(bpy.types.Panel):
         #                                         icon="MOD_DATA_TRANSFER")
         #
         # let's check the version of blender
+
         if bpy.app.version <= (4, 00, 0):
             utility_box_layout = main_box_layout.box()
             utility_label = utility_box_layout.row(align=True)
@@ -275,8 +276,10 @@ class DATA_PT_mesh_data_transfer(bpy.types.Panel):
         else:
             # Rigging utilities
             header, utility_box_panel = main_box_layout.panel("rigging_helpers", default_closed=True)
-            header.label(text="RIGGING HELPERS")
-            utility_box_layout = utility_box_panel.box()
+            if header is not None:
+                header.label(text="RIGGING HELPERS")
+            if utility_box_panel is not None:
+                utility_box_layout = utility_box_panel.box()
             expanded = utility_box_panel is not None
 
         if expanded:
